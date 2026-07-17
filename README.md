@@ -16,7 +16,6 @@ Smart Cities track.
 9. [Submission Form Mapping](#submission-form-mapping)
 10. [What Makes This Different](#what-makes-this-different)
 
----
 
 ## Real-world traffic lookup (Google Maps)
 Genie can now answer questions about ANY real place — not just monitored
@@ -54,11 +53,8 @@ genuine Smart Cities submission rather than a single-camera demo:
 3. **Converse** — a control-room chat agent an operator can ask questions to, grounded in real logged data
 4. **Coordinate & Predict** — a corridor agent sequences signals across multiple connected junctions for a "green wave", and a forecasting agent flags junctions trending toward congestion before it happens
 
----
-
 ## Architecture
 
-```
 Traffic camera frames (multiple junctions)
         │
         ▼
@@ -89,8 +85,6 @@ Separately:
         └──► Gemini answers, grounded only in that real data
 ```
 
----
-
 ## Technology Stack
 
 ### Backend
@@ -114,7 +108,6 @@ Separately:
 Firebase, Cloud Run, MCP, GCP (beyond Vertex AI) — these are documented as
 "next steps" below, not implemented yet. Only tick what's genuinely in the code.
 
----
 
 ## About the camera
 
@@ -125,11 +118,9 @@ frames would arrive automatically from junction cameras; for the hackathon
 demo, upload/simulation stands in for that. Say this explicitly in your
 pitch — judges understand hardware access isn't feasible in a hackathon.
 
----
 
 ## Project Structure
 
-```
 signalsense-ai/
 ├── main.py                     # FastAPI app — all API routes live here. Start here.
 ├── requirements.txt            # Python dependencies
@@ -169,7 +160,6 @@ signalsense-ai/
     └── index.html              # Minimal test page (optional, for quick debugging)
 ```
 
----
 
 ## How the Chat Agent Works
 
@@ -188,7 +178,6 @@ This is the part most people get confused about, so here's the exact mechanism:
 Before recording your demo video, upload **5–10 varied test frames** across a
 few different junction IDs so the chat answers have real substance.
 
----
 
 ## Setup & Installation
 
@@ -273,7 +262,6 @@ The included `.gitignore` already excludes `.env`, `venv/`, and `__pycache__/`
 so your real API keys never get pushed publicly. Double check `git status`
 before your first commit to confirm `.env` is not listed.
 
----
 
 ## Submission Form Mapping
 
