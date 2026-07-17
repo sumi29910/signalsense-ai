@@ -5,9 +5,9 @@ adjustment. Starts as simple threshold logic — swap in a Vertex AI model
 later once you have real labeled data.
 """
 import os
-import json
 import base64
 import google.generativeai as genai
+from agents.json_utils import extract_json
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -40,14 +40,22 @@ def analyze_congestion(image_bytes: bytes, history: dict | None = None) -> dict:
 
     try:
         response = model.generate_content([CONGESTION_PROMPT, image_part])
-        text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
-        parsed = json.loads(text)
+        parsed = extract_json(response.text)
+        if parsed is None:
+            parsed = {
+                "density_level": "unknown",
+                "estimated_vehicles": 0,
+                "recommended_green_time_seconds": 30,
+                "reasoning": "Could not parse model response as JSON.",
+                "parse_error": True,
+                "raw_response": response.text[:200],
+            }
     except Exception as e:
         parsed = {
             "density_level": "unknown",
             "estimated_vehicles": 0,
             "recommended_green_time_seconds": 30,
-            "reasoning": "parse_error",
+            "reasoning": "API error occurred.",
             "api_error": str(e),
         }
 

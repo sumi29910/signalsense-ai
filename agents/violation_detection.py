@@ -5,9 +5,9 @@ structured violation data. This is the agent judges will look at closely —
 keep the prompt tight and the output schema strict (valid JSON only).
 """
 import os
-import json
 import base64
 import google.generativeai as genai
+from agents.json_utils import extract_json
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -45,8 +45,9 @@ def detect_violations(image_bytes: bytes, history: dict | None = None) -> dict:
 
     try:
         response = model.generate_content([VIOLATION_PROMPT, image_part])
-        text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
-        parsed = json.loads(text)
+        parsed = extract_json(response.text)
+        if parsed is None:
+            parsed = {"violations_found": [], "vehicle_count_estimate": 0, "parse_error": True, "raw_response": response.text[:200]}
     except Exception as e:
         # Covers quota errors, network errors, and bad JSON — never let a
         # Gemini API failure take down the whole analyze-junction request.
