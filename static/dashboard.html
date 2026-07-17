@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SignalSense AI — Smart City Control</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --bg:#070d1a; --panel:#0f1a2f; --panel2:#0a1324; --border:#1a2a4a;
+    --text:#eef2fb; --muted:#7787a8; --accent:#4a7dff; --accent2:#7a4dff;
+    --green:#22d4b3; --amber:#f5a623; --red:#ef4b52;
+    --radius:14px; --radius-sm:10px; --font:-apple-system,"Segoe UI",sans-serif;
+  }
+  html,body { height:100%; }
+  body {
+    font-family:var(--font); background:var(--bg); color:var(--text); overflow:hidden;
+    background-image:radial-gradient(ellipse at 15% 0%, rgba(74,125,255,0.07) 0%, transparent 55%),
+                      radial-gradient(ellipse at 85% 100%, rgba(122,77,255,0.06) 0%, transparent 55%);
+  }
+  ::-webkit-scrollbar{width:5px;} ::-webkit-scrollbar-thumb{background:var(--accent);border-radius:10px;}
+
+  .app { display:flex; height:100vh; }
+
+  /* ---------------- SIDEBAR ---------------- */
+  .sidebar {
+    width:220px; flex-shrink:0; background:rgba(15,26,47,0.85); backdrop-filter:blur(16px);
+    border-right:1px solid var(--border); display:flex; flex-direction:column; padding:18px 12px;
+    transition:width 0.2s ease;
+  }
+  .sidebar .brand { display:flex; align-items:center; gap:10px; padding:6px 10px 20px; }
+  .sidebar .brand .icon { font-size:24px; }
+  .sidebar .brand h1 {
+    font-size:16px; font-weight:800;
+    background:linear-gradient(135deg,#fff 30%,var(--accent),var(--accent2));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  }
+  .sidebar .brand span { display:block; font-size:10px; color:var(--muted); -webkit-text-fill-color:var(--muted); font-weight:400; }
+
+  .nav-item {
+    display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:10px;
+    color:var(--muted); font-size:13px; font-weight:600; cursor:pointer; transition:0.15s ease; margin-bottom:2px;
+  }
+  .nav-item:hover { background:var(--panel2); color:var(--text); }
+  .nav-item.active { background:linear-gradient(135deg, rgba(74,125,255,0.18), rgba(122,77,255,0.12)); color:#fff; border:1px solid rgba(74,125,255,0.3); }
+  .nav-item .n-icon { font-size:16px; width:20px; text-align:center; }
+
+  .sidebar-footer { margin-top:auto; padding:12px 10px; font-size:10.5px; color:var(--muted); border-top:1px solid var(--border); }
+  .server-dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:5px; }
+
+  /* ---------------- MAIN AREA ---------------- */
+  .main { flex:1; display:flex; flex-direction:column; min-width:0; height:100vh; overflow:hidden; }
+
+  .topbar {
+    display:flex; align-items:center; justify-content:space-between; padding:16px 26px;
+    border-bottom:1px solid var(--border); flex-shrink:0; flex-wrap:wrap; gap:10px;
+  }
+  .topbar h2 { font-size:18px; font-weight:700; }
+  .status-badge, .clock {
+    display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted);
+    background:var(--panel2); padding:6px 14px; border-radius:30px; border:1px solid var(--border);
+  }
+  .live-dot { width:7px; height:7px; border-radius:50%; background:var(--green); animation:pulse-dot 1.8s infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:0.4;transform:scale(1.5);} }
+
+  .content { flex:1; overflow-y:auto; padding:22px 26px; }
+  .page { display:none; animation:fadeIn 0.25s ease; }
+  .page.active { display:block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:translateY(0);} }
+
+  .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:18px; }
+  .stat-card { padding:14px 18px; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); position:relative; overflow:hidden; transition:0.15s ease; }
+  .stat-card:hover { border-color:var(--accent); transform:translateY(-2px); }
+  .stat-card .glow { position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--accent),var(--accent2)); opacity:0.5; }
+  .stat-label { font-size:10px; text-transform:uppercase; letter-spacing:0.6px; color:var(--muted); font-weight:700; }
+  .stat-value { font-size:clamp(20px,2.5vw,30px); font-weight:800; margin-top:2px; background:linear-gradient(135deg,#fff,#b0c4ff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .panel { padding:18px 20px; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:16px; }
+  .panel h3 { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--muted); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  .badge { font-size:9px; font-weight:700; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; padding:3px 10px; border-radius:20px; }
+  .badge.green { background:var(--green); color:var(--bg); }
+
+  .upload-zone { border:2px dashed var(--border); border-radius:var(--radius-sm); padding:22px 14px; text-align:center; cursor:pointer; transition:0.2s ease; background:var(--panel2); }
+  .upload-zone:hover, .upload-zone.dragover { border-color:var(--accent); background:rgba(74,125,255,0.05); }
+  .upload-zone input[type=file] { display:none; }
+  .preview-wrap { display:none; align-items:center; gap:10px; }
+  .preview-wrap.active { display:flex; }
+  .preview-thumb { width:52px; height:52px; border-radius:8px; object-fit:cover; border:1px solid var(--border); }
+  .preview-name { font-size:11px; color:var(--muted); flex:1; text-align:left; word-break:break-all; }
+  .preview-clear { background:none; border:none; color:var(--red); font-size:16px; cursor:pointer; }
+
+  input[type=text], select {
+    background:var(--panel2); border:1px solid var(--border); color:var(--text); border-radius:8px;
+    padding:9px 12px; width:100%; font-size:13px; font-family:var(--font); outline:none;
+  }
+  input[type=text]:focus, select:focus { border-color:var(--accent); }
+  .row { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  .row > * { flex:1; min-width:120px; }
+
+  .btn {
+    padding:9px 18px; border:none; border-radius:9px; font-size:12.5px; font-weight:700; font-family:var(--font);
+    cursor:pointer; transition:0.15s ease; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; flex-shrink:0;
+  }
+  .btn:hover { opacity:0.88; transform:translateY(-1px); }
+  .btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+  .btn.icon-btn { padding:9px 12px; }
+  .btn.mic-active { background:linear-gradient(135deg,var(--red),#c22f34); animation:pulse-dot 1s infinite; }
+
+  .out-box { margin-top:12px; background:var(--panel2); border-radius:10px; padding:12px; font-size:13px; white-space:pre-wrap; max-height:220px; overflow-y:auto; border:1px solid var(--border); }
+  .status-line { margin-top:8px; font-size:12px; color:var(--muted); }
+  .status-line.error { color:var(--red); } .status-line.success { color:var(--green); }
+
+  .tag { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; margin:2px 4px 2px 0; }
+  .tag.violation { background:rgba(239,75,82,0.15); color:var(--red); border:1px solid rgba(239,75,82,0.3); }
+  .tag.emergency { background:rgba(245,166,35,0.15); color:var(--amber); border:1px solid rgba(245,166,35,0.3); }
+  .tag.ok { background:rgba(46,204,113,0.15); color:var(--green); border:1px solid rgba(34,212,179,0.3); }
+
+  .list-container { display:flex; flex-direction:column; gap:5px; max-height:420px; overflow-y:auto; }
+  .list-item { display:flex; align-items:flex-start; gap:10px; padding:8px 12px; border-radius:var(--radius-sm); background:var(--panel2); border-left:3px solid var(--border); font-size:12.5px; }
+  .li-icon { font-size:14px; flex-shrink:0; }
+  .li-body { flex:1; min-width:0; }
+  .li-time { font-size:10px; color:var(--muted); }
+  .empty-note { color:var(--muted); font-size:12px; padding:16px 0; text-align:center; }
+
+  /* ---- Overview hero + quick actions ---- */
+  .hero-banner {
+    display:flex; align-items:center; justify-content:space-between; gap:20px;
+    background:linear-gradient(120deg, rgba(74,125,255,0.12), rgba(122,77,255,0.08));
+    border:1px solid var(--border); border-radius:var(--radius); padding:26px 28px; margin-bottom:18px;
+    position:relative; overflow:hidden;
+  }
+  .hero-eyebrow { font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.6px; margin-bottom:8px; }
+  .hero-title { font-size:24px; font-weight:800; margin-bottom:8px; background:linear-gradient(135deg,#fff,#c7d5ff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .hero-sub { font-size:13px; color:var(--muted); max-width:460px; line-height:1.6; }
+  .hero-orb {
+    width:120px; height:120px; border-radius:50%; flex-shrink:0;
+    background:radial-gradient(circle at 35% 35%, rgba(122,77,255,0.5), rgba(74,125,255,0.15) 60%, transparent 75%);
+    filter:blur(2px); animation:orb-float 4s ease-in-out infinite;
+  }
+  @keyframes orb-float { 0%,100% { transform:translateY(0) scale(1); } 50% { transform:translateY(-8px) scale(1.05); } }
+
+  .quick-actions { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:18px; }
+  .qa-card {
+    display:flex; align-items:center; gap:12px; padding:16px 18px; background:var(--panel);
+    border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; transition:0.15s ease;
+  }
+  .qa-card:hover { border-color:var(--accent); transform:translateY(-2px); background:var(--panel2); }
+  .qa-icon { font-size:22px; }
+  .qa-title { font-size:13px; font-weight:700; }
+  .qa-sub { font-size:11px; color:var(--muted); margin-top:1px; }
+  @media (max-width:700px) { .quick-actions { grid-template-columns:1fr; } .hero-banner { flex-direction:column; text-align:center; } .hero-orb { display:none; } }
+
+  /* ---- Route traffic result ---- */
+  .route-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .route-stat { background:var(--panel2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; text-align:center; }
+  .rs-label { font-size:10px; text-transform:uppercase; color:var(--muted); font-weight:700; letter-spacing:0.5px; }
+  .rs-value { font-size:16px; font-weight:800; margin-top:4px; }
+  .congestion-pill { margin-top:12px; text-align:center; padding:8px; border-radius:20px; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; }
+  .congestion-pill.light { background:rgba(34,212,179,0.15); color:var(--green); }
+  .congestion-pill.moderate { background:rgba(245,166,35,0.15); color:var(--amber); }
+  .congestion-pill.heavy { background:rgba(239,75,82,0.15); color:var(--red); }
+
+  .mini-banner {
+    display:flex; align-items:center; gap:14px; padding:16px 20px; margin-bottom:16px;
+    background:linear-gradient(120deg, rgba(74,125,255,0.08), rgba(122,77,255,0.05));
+    border:1px solid var(--border); border-radius:var(--radius);
+  }
+  .mb-icon { font-size:24px; }
+  .mb-title { font-size:14px; font-weight:700; }
+  .mb-sub { font-size:11.5px; color:var(--muted); margin-top:2px; }
+
+  .chat-wrap { display:flex; flex-direction:column; height:calc(100vh - 200px); }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .chip { background:var(--panel2); border:1px solid var(--border); color:var(--muted); padding:5px 11px; border-radius:20px; font-size:11px; cursor:pointer; transition:0.15s ease; }
+  .chip:hover { border-color:var(--accent); color:var(--text); }
+  .chat-messages { flex:1; overflow-y:auto; background:var(--panel2); border-radius:var(--radius-sm); padding:14px 16px; border:1px solid var(--border); margin-bottom:10px; }
+  .chat-msg { margin-bottom:12px; font-size:13px; line-height:1.55; padding:9px 12px; border-radius:var(--radius-sm); background:rgba(15,26,47,0.5); animation:fadeIn 0.2s ease; }
+  .role { font-weight:800; font-size:11.5px; display:block; margin-bottom:3px; }
+  .role.assistant { color:var(--green); } .role.user { color:var(--amber); } .role.system { color:var(--red); }
+  .chat-input-row { display:flex; gap:8px; }
+  .chat-input-row input { flex:1; padding:11px 16px; }
+  .spinner { display:inline-block; width:13px; height:13px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; vertical-align:middle; margin-right:5px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .voice-toggle { display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--muted); margin-bottom:10px; }
+  .switch { position:relative; width:36px; height:20px; background:var(--panel2); border:1px solid var(--border); border-radius:20px; cursor:pointer; flex-shrink:0; }
+  .switch .knob { position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:var(--muted); transition:0.2s ease; }
+  .switch.on { background:linear-gradient(135deg,var(--accent),var(--accent2)); }
+  .switch.on .knob { left:18px; background:#fff; }
+
+  @media (max-width:980px) {
+    .sidebar { width:64px; }
+    .sidebar .brand h1, .sidebar .brand span, .nav-item span.label { display:none; }
+    .nav-item { justify-content:center; }
+    .grid-2 { grid-template-columns:1fr; }
+    .stats-grid { grid-template-columns:repeat(2,1fr); }
+  }
+  @media (max-width:560px) {
+    .content { padding:16px; }
+    .topbar { padding:12px 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="sidebar">
+    <div class="brand"><span class="icon">🚦</span><div><h1>SignalSense</h1><span>Smart City Control</span></div></div>
+    <div class="nav-item active" data-page="chat"><span class="n-icon">💬</span><span class="label">AI Assistant (Genie)</span></div>
+    <div class="nav-item" data-page="overview"><span class="n-icon">📊</span><span class="label">Overview</span></div>
+    <div class="nav-item" data-page="analyze"><span class="n-icon">🔍</span><span class="label">Analyze Frame</span></div>
+    <div class="nav-item" data-page="feed"><span class="n-icon">🔔</span><span class="label">Live Feed</span></div>
+    <div class="nav-item" data-page="history"><span class="n-icon">📋</span><span class="label">History</span></div>
+    <div class="nav-item" data-page="corridor"><span class="n-icon">🌊</span><span class="label">Corridor & Forecast</span></div>
+    <div class="nav-item" data-page="location"><span class="n-icon">🌍</span><span class="label">Location Search</span></div>
+    <div class="sidebar-footer"><span class="server-dot" id="serverDot" style="background:var(--muted);"></span><span id="serverStatus">Checking…</span></div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <h2 id="pageTitle">AI Assistant (Genie)</h2>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <span class="status-badge"><span class="live-dot"></span><span id="statusText">All systems nominal</span></span>
+        <span class="clock" id="clock">--:--</span>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- OVERVIEW -->
+      <div class="page" id="page-overview">
+        <div class="hero-banner">
+          <div>
+            <div class="hero-eyebrow">🚦 Smart Cities · Traffic Enforcement & Congestion</div>
+            <h2 class="hero-title">Welcome to SignalSense AI</h2>
+            <p class="hero-sub">Detect violations, coordinate green waves, and talk to <strong>Genie</strong> — your control-room analyst — all from one place.</p>
+          </div>
+          <div class="hero-orb"></div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card"><div class="glow"></div><div class="stat-label">Events logged</div><div class="stat-value" id="statEvents">0</div></div>
+          <div class="stat-card"><div class="glow"></div><div class="stat-label">Violations</div><div class="stat-value" id="statViolations">0</div></div>
+          <div class="stat-card"><div class="glow"></div><div class="stat-label">Emergency triggers</div><div class="stat-value" id="statEmergency">0</div></div>
+          <div class="stat-card"><div class="glow"></div><div class="stat-label">Junctions tracked</div><div class="stat-value" id="statJunctions">0</div></div>
+        </div>
+
+        <div class="quick-actions">
+          <div class="qa-card" data-page="analyze"><span class="qa-icon">🔍</span><div><div class="qa-title">Analyze a frame</div><div class="qa-sub">Simulate a camera feed</div></div></div>
+          <div class="qa-card" data-page="corridor"><span class="qa-icon">🌊</span><div><div class="qa-title">Plan a green wave</div><div class="qa-sub">Coordinate a corridor</div></div></div>
+          <div class="qa-card" data-page="chat"><span class="qa-icon">💬</span><div><div class="qa-title">Ask Genie</div><div class="qa-sub">Talk or type a question</div></div></div>
+        </div>
+
+        <div class="panel">
+          <h3>🗺️ Network status</h3>
+          <div id="networkGrid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px;"></div>
+        </div>
+      </div>
+
+      <!-- ANALYZE -->
+      <div class="page" id="page-analyze">
+        <div class="panel">
+          <h3>📤 Upload frame <span class="badge">Simulate camera</span></h3>
+          <div class="upload-zone" id="uploadZone">
+            <div id="dropPrompt"><div style="font-size:30px;">🖼️</div><p style="color:var(--muted);font-size:12px;margin-top:4px;">Drop image or <span style="color:var(--accent);font-weight:700;">browse</span></p></div>
+            <div class="preview-wrap" id="previewWrap"><img class="preview-thumb" id="previewThumb"><span class="preview-name" id="previewName"></span><button class="preview-clear" id="previewClear">✕</button></div>
+            <input type="file" id="fileInput" accept="image/*">
+          </div>
+          <div class="row">
+            <select id="junctionSelect">
+              <option value="junction_01">📍 Junction 01 — Downtown</option>
+              <option value="junction_02">📍 Junction 02 — East Gate</option>
+              <option value="junction_03">📍 Junction 03 — West Corridor</option>
+              <option value="junction_04">📍 Junction 04 — North Bridge</option>
+            </select>
+            <button class="btn" id="uploadBtn" disabled>🚀 Analyze</button>
+          </div>
+          <div class="status-line" id="uploadStatus">Select an image to enable analysis.</div>
+          <div class="out-box" id="result-box" style="display:none;"></div>
+        </div>
+      </div>
+
+      <!-- LIVE FEED -->
+      <div class="page" id="page-feed">
+        <div class="mini-banner"><span class="mb-icon">🔔</span><div><div class="mb-title">Live activity stream</div><div class="mb-sub">Every detection across the network appears here in real time, newest first.</div></div></div>
+        <div class="panel">
+          <h3>🔔 Live feed <span class="badge green">Live</span> <span id="feedCount" style="margin-left:auto;font-size:11px;color:var(--muted);font-weight:400;"></span></h3>
+          <div class="list-container" id="feedContainer"><div class="empty-note">📭 No events yet — head to <strong>Analyze Frame</strong> or start a simulated feed to see activity here.</div></div>
+        </div>
+      </div>
+
+      <!-- HISTORY -->
+      <div class="page" id="page-history">
+        <div class="mini-banner"><span class="mb-icon">📋</span><div><div class="mb-title">Audit trail</div><div class="mb-sub">A running log of every junction event — useful for reviewing what happened and when.</div></div></div>
+        <div class="panel">
+          <h3>📋 Full history</h3>
+          <div class="list-container" id="historyList"><div class="empty-note">🗂️ Nothing logged yet — this fills up automatically as frames get analyzed.</div></div>
+        </div>
+      </div>
+
+      <!-- CORRIDOR & FORECAST -->
+      <div class="page" id="page-corridor">
+        <div class="mini-banner"><span class="mb-icon">🌊</span><div><div class="mb-title">Network-scale coordination</div><div class="mb-sub">Sequence signals across connected junctions, and see where congestion is heading before it happens.</div></div></div>
+        <div class="grid-2">
+          <div class="panel">
+            <h3>🌊 Corridor coordination (green wave)</h3>
+            <input type="text" id="corridorIds" placeholder="junction_01,junction_02,junction_03" value="junction_01,junction_02,junction_03">
+            <div class="row"><button class="btn" onclick="optimizeCorridor()">Generate plan</button></div>
+            <div class="out-box" id="corridor-box">Runs the corridor agent across listed junctions, in order.</div>
+          </div>
+          <div class="panel">
+            <h3>📈 Congestion forecast</h3>
+            <input type="text" id="forecastId" placeholder="Junction ID" value="junction_01">
+            <div class="row"><button class="btn" onclick="getForecast()">Forecast trend</button></div>
+            <div class="out-box" id="forecast-box">Needs at least 2 logged events to forecast.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOCATION SEARCH -->
+      <div class="page" id="page-location">
+        <div class="panel">
+          <h3>🚦 Real live traffic <span class="badge green">Google Maps</span></h3>
+          <p style="font-size:12px; color:var(--muted); margin-bottom:10px;">Enter a route (or just a destination — origin defaults to city center) to check real current traffic conditions.</p>
+          <div class="row">
+            <input type="text" id="routeOrigin" placeholder="Origin (e.g. Korba)">
+            <input type="text" id="routeDest" placeholder="Destination (e.g. Sunaliya Chowk, Korba)">
+          </div>
+          <div class="row"><button class="btn" onclick="checkRouteTraffic()">🚦 Check real traffic</button></div>
+          <div id="route-result" style="display:none; margin-top:14px;">
+            <div class="route-stats">
+              <div class="route-stat"><div class="rs-label">Distance</div><div class="rs-value" id="rs-distance">—</div></div>
+              <div class="route-stat"><div class="rs-label">Normal time</div><div class="rs-value" id="rs-normal">—</div></div>
+              <div class="route-stat"><div class="rs-label">Current time</div><div class="rs-value" id="rs-current">—</div></div>
+            </div>
+            <div class="congestion-pill" id="rs-level">—</div>
+          </div>
+          <div class="out-box" id="route-error" style="display:none;"></div>
+        </div>
+
+        <div class="panel">
+          <h3>🌍 General city knowledge <span class="badge">Gemini</span></h3>
+          <p style="font-size:12px; color:var(--muted); margin-bottom:10px;">Broader questions (not live data) — typical patterns for any city worldwide.</p>
+          <input type="text" id="locationInput" placeholder="e.g. How's traffic usually in Mumbai during rush hour?">
+          <div class="row"><button class="btn" onclick="askLocation()">🔎 Search</button></div>
+          <div class="out-box" id="location-box" style="display:none;"></div>
+        </div>
+      </div>
+
+      <!-- CHAT -->
+      <div class="page active" id="page-chat">
+        <div class="panel chat-wrap">
+          <h3>💬 Genie <span class="badge" id="engineBadge">Gemini</span></h3>
+          <div class="voice-toggle">
+            <div class="switch" id="voiceOutToggle"><div class="knob"></div></div>
+            <span>Read replies aloud</span>
+          </div>
+          <div class="chips">
+            <span class="chip" onclick="askChip(this)">Which junction had the most violations?</span>
+            <span class="chip" onclick="askChip(this)">Any emergency vehicles today?</span>
+            <span class="chip" onclick="askChip(this)">Forecast for junction_01</span>
+            <span class="chip" onclick="askChip(this)">How's traffic at Sunaliya Chowk, Korba right now?</span>
+          </div>
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-msg"><span class="role assistant">🤖 Genie</span><span>Hello! I'm Genie. Ask about your monitored junctions, or a real place like "traffic at MG Road, Korba" — I'll pull live data. Type, or tap 🎤 to speak.</span></div>
+          </div>
+          <div class="chat-input-row">
+            <button class="btn icon-btn" id="micBtn" title="Speak your question">🎤</button>
+            <input type="text" id="chatInput" placeholder="Type or speak your question…">
+            <button class="btn" id="chatBtn">Send</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = "";
+const $ = id => document.getElementById(id);
+
+// ---------- Sidebar nav ----------
+const pageTitles = { overview:'Overview', analyze:'Analyze Frame', feed:'Live Feed', history:'History', corridor:'Corridor & Forecast', location:'Location Search', chat:'AI Assistant (Genie)' };
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    item.classList.add('active');
+    const page = item.dataset.page;
+    $('page-' + page).classList.add('active');
+    $('pageTitle').textContent = pageTitles[page];
+  });
+});
+
+// ---------- Quick action cards (Overview page) ----------
+document.querySelectorAll('.qa-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelector(`.nav-item[data-page="${card.dataset.page}"]`)?.click();
+  });
+});
+
+// ---------- Clock ----------
+function tickClock() {
+  const now = new Date();
+  $('clock').textContent = now.toLocaleTimeString('en-IN', { hour12:false });
+  const h = now.getHours();
+  $('statusText').textContent = (h<12?'🌅 Morning':h<17?'☀️ Afternoon':'🌙 Evening') + ' · All systems nominal';
+}
+tickClock(); setInterval(tickClock, 1000);
+
+// ---------- Upload flow ----------
+const uploadZone=$('uploadZone'), fileInput=$('fileInput'), dropPrompt=$('dropPrompt');
+const previewWrap=$('previewWrap'), previewThumb=$('previewThumb'), previewName=$('previewName'), previewClear=$('previewClear');
+const uploadBtn=$('uploadBtn'), uploadStatus=$('uploadStatus');
+let selectedFile=null;
+
+uploadZone.addEventListener('click', e => { if (e.target!==previewClear) fileInput.click(); });
+['dragover','dragleave','drop'].forEach(evt => uploadZone.addEventListener(evt, e=>e.preventDefault()));
+uploadZone.addEventListener('dragover', ()=>uploadZone.classList.add('dragover'));
+uploadZone.addEventListener('dragleave', ()=>uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => { uploadZone.classList.remove('dragover'); if(e.dataTransfer.files.length) setSelectedFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => { if(fileInput.files.length) setSelectedFile(fileInput.files[0]); });
+
+function setSelectedFile(file) {
+  selectedFile=file; dropPrompt.style.display='none'; previewWrap.classList.add('active');
+  previewThumb.src=URL.createObjectURL(file); previewName.textContent=file.name;
+  uploadBtn.disabled=false; setStatus('Ready — click Analyze.', '');
+}
+previewClear.addEventListener('click', e => {
+  e.stopPropagation(); selectedFile=null; fileInput.value='';
+  dropPrompt.style.display=''; previewWrap.classList.remove('active'); uploadBtn.disabled=true;
+  setStatus('Select an image to enable analysis.', '');
+});
+function setStatus(msg,type){ uploadStatus.textContent=msg; uploadStatus.className='status-line'+(type?' '+type:''); }
+
+uploadBtn.addEventListener('click', async () => {
+  if(!selectedFile){ setStatus('Select an image first.','error'); return; }
+  const junction=$('junctionSelect').value;
+  const fd=new FormData(); fd.append('junction_id',junction); fd.append('frame',selectedFile);
+  setStatus('⏳ Analyzing…',''); uploadBtn.disabled=true;
+  const box=$('result-box'); box.style.display='block'; box.textContent='Analyzing…';
+  try {
+    const res=await fetch(`${API_BASE}/analyze-junction`,{method:'POST',body:fd});
+    const data=await res.json();
+    if(res.ok){
+      setStatus('✅ Complete — analyze another frame anytime.','success');
+      renderResult(data, box);
+      addFeed('📸', `Analyzed ${junction}`, 'ok', 'analyzed'); addHistory(junction,'Frame analyzed');
+      const violations=(data.violations&&data.violations.violations_found)||[];
+      violations.forEach(v => { addFeed('🚨', `Violation: ${v.type} at ${junction}`, 'violation','violation'); addHistory(junction,`Violation: ${v.type}`); });
+      const density=data.congestion&&data.congestion.density_level;
+      if(density){ addFeed('📊', `Congestion: ${density} at ${junction}`,'ok','congestion'); addHistory(junction,`Congestion: ${density}`); }
+      if(data.emergency&&data.emergency.emergency_vehicle_detected){ addFeed('🚑', `Emergency vehicle at ${junction}`,'emergency','emergency'); addHistory(junction,'Emergency vehicle'); }
+      refreshStats();
+    } else { setStatus('❌ '+(data.detail||'Analysis failed'),'error'); }
+  } catch(err){ setStatus('❌ Connection failed: '+err.message+' (check terminal for a crash)','error'); }
+  uploadBtn.disabled=false;
+});
+
+function renderResult(data, box) {
+  const violations=(data.violations&&data.violations.violations_found)||[];
+  const density=(data.congestion&&data.congestion.density_level)||'unknown';
+  const vehicles=(data.congestion&&data.congestion.estimated_vehicles);
+  const greenTime=(data.congestion&&data.congestion.recommended_green_time_seconds);
+  const reasoning=(data.congestion&&data.congestion.reasoning)||'';
+  const emergency=data.emergency&&data.emergency.emergency_vehicle_detected;
+  const junctionId=data.junction_id||'this junction';
+
+  let badges='';
+  if(violations.length===0) badges+=`<span class="tag ok">No violations detected</span>`;
+  else violations.forEach(v=>{ badges+=`<span class="tag violation">${v.type} (${Math.round((v.confidence||0)*100)}%)</span>`; });
+  badges+=`<span class="tag ok">Congestion: ${density}</span>`;
+  if(emergency) badges+=`<span class="tag emergency">Emergency vehicle detected</span>`;
+
+  // Plain-language summary instead of raw JSON
+  let summary = `<div style="margin-top:10px; line-height:1.7; font-size:13px;">`;
+  summary += `<strong>${junctionId}</strong> analyzed successfully.<br>`;
+  if(violations.length===0){
+    summary += `No traffic violations were found in this frame.<br>`;
+  } else {
+    summary += `Found ${violations.length} violation(s): ` + violations.map(v=>`${v.type} (${Math.round((v.confidence||0)*100)}% confident)`).join(', ') + `.<br>`;
+  }
+  summary += `Congestion level is <strong>${density}</strong>` + (vehicles!==undefined ? ` — roughly ${vehicles} vehicles estimated in frame.` : '.') + `<br>`;
+  if(greenTime!==undefined) summary += `Recommended signal green time: <strong>${greenTime} seconds</strong>.<br>`;
+  if(reasoning) summary += `<span style="color:var(--muted);">${reasoning}</span><br>`;
+  if(emergency) summary += `<strong style="color:var(--amber);">🚑 An emergency vehicle was detected — priority signal action recommended.</strong><br>`;
+  summary += `</div>`;
+
+  summary += `<details style="margin-top:10px;"><summary style="cursor:pointer; color:var(--muted); font-size:11px;">View raw data (technical)</summary>`;
+  summary += `<pre style="white-space:pre-wrap;margin-top:8px;font-size:11px;">${JSON.stringify(data,null,2)}</pre></details>`;
+
+  box.innerHTML = badges + summary;
+}
+
+// ---------- Feed / History ----------
+function addFeed(icon,text,tagClass,tagText){
+  const c=$('feedContainer'); const empty=c.querySelector('.empty-note'); if(empty) empty.remove();
+  const item=document.createElement('div'); item.className='list-item';
+  const time=new Date().toLocaleTimeString('en-IN',{hour12:false});
+  item.innerHTML=`<span class="li-icon">${icon}</span><div class="li-body"><span>${text}</span> <span class="tag ${tagClass}">${tagText}</span><div class="li-time">${time}</div></div>`;
+  c.prepend(item); while(c.children.length>50) c.removeChild(c.lastChild);
+  $('feedCount').textContent=c.children.length+' events';
+}
+function addHistory(junction,event){
+  const l=$('historyList'); const empty=l.querySelector('.empty-note'); if(empty) empty.remove();
+  const item=document.createElement('div'); item.className='list-item';
+  const time=new Date().toLocaleTimeString('en-IN',{hour12:false});
+  item.innerHTML=`<div class="li-body"><strong>${junction}</strong> — ${event}<div class="li-time">${time}</div></div>`;
+  l.prepend(item); while(l.children.length>50) l.removeChild(l.lastChild);
+}
+
+// ---------- Stats / network ----------
+async function refreshStats(){
+  try {
+    const res=await fetch(`${API_BASE}/overview`); const data=await res.json();
+    const lines=(data.summary||'').split('\n').filter(l=>l.trim());
+    let violations=0, emergency=0; const jmap={};
+    lines.forEach(l=>{
+      if(!l.includes('violations=[none]')) violations++;
+      if(l.includes('emergency_vehicle=True')) emergency++;
+      const m=l.match(/Junction (\S+):/);
+      if(m){ const d=l.match(/congestion=(\w+)/); jmap[m[1]]={density:d?d[1]:'unknown', hasV:!l.includes('violations=[none]')}; }
+    });
+    $('statEvents').textContent=lines.length; $('statViolations').textContent=violations;
+    $('statEmergency').textContent=emergency; $('statJunctions').textContent=Object.keys(jmap).length;
+    renderNetworkGrid(jmap);
+    $('serverStatus').textContent='Connected'; $('serverDot').style.background='var(--green)';
+  } catch(e){ $('serverStatus').textContent='Server unreachable'; $('serverDot').style.background='var(--red)'; }
+}
+refreshStats(); setInterval(refreshStats, 15000);
+
+function renderNetworkGrid(jmap){
+  const grid=$('networkGrid'); const ids=Object.keys(jmap);
+  if(!ids.length){ grid.innerHTML='<div class="empty-note">No junctions logged yet.</div>'; return; }
+  grid.innerHTML=ids.map(jid=>{
+    const j=jmap[jid]; const color=(j.density==='high'||j.density==='severe')?'var(--red)':j.density==='medium'?'var(--amber)':'var(--green)';
+    return `<div class="stat-card" style="border-left:3px solid ${color};"><div class="stat-label">${jid}</div><div class="stat-value" style="font-size:16px;">${j.density}</div>${j.hasV?'<span class="tag violation">violation</span>':''}</div>`;
+  }).join('');
+}
+
+// ---------- Corridor / Forecast ----------
+async function optimizeCorridor(){
+  const ids=$('corridorIds').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const box=$('corridor-box'); box.textContent='Computing green-wave plan…';
+  const res=await fetch(`${API_BASE}/corridor/optimize`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({junction_ids:ids})});
+  const data=await res.json();
+  let html=`<div style="margin-bottom:6px;">${data.reasoning||''}</div>`;
+  (data.corridor_plan||[]).forEach(p=>{ html+=`<div>• ${p.junction_id}: green at +${p.green_offset_seconds}s, holds ${p.green_duration_seconds}s</div>`; });
+  box.innerHTML=html;
+}
+async function getForecast(){
+  const jid=$('forecastId').value.trim(); if(!jid) return;
+  const box=$('forecast-box'); box.textContent='Forecasting…';
+  const res=await fetch(`${API_BASE}/junction/${jid}/forecast`); const data=await res.json();
+  const color=data.trend==='rising'?'var(--red)':data.trend==='falling'?'var(--green)':'var(--muted)';
+  box.innerHTML=`<span style="color:${color};font-weight:700;">${(data.trend||'').toUpperCase()}</span> — ${data.message||''}`;
+}
+
+// ---------- Real route traffic (Google Maps) ----------
+async function checkRouteTraffic(){
+  const origin=$('routeOrigin').value.trim();
+  const dest=$('routeDest').value.trim();
+  const resultBox=$('route-result'), errorBox=$('route-error');
+  if(!dest){ errorBox.style.display='block'; errorBox.textContent='Enter at least a destination.'; resultBox.style.display='none'; return; }
+  errorBox.style.display='none'; resultBox.style.display='none';
+
+  try {
+    const res=await fetch(`${API_BASE}/route-traffic`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({origin:origin||'city center',destination:dest})});
+    const data=await res.json();
+    if(data.error){ errorBox.style.display='block'; errorBox.textContent='⚠️ '+data.error; return; }
+    $('rs-distance').textContent=data.distance;
+    $('rs-normal').textContent=data.normal_duration;
+    $('rs-current').textContent=data.current_duration;
+    const pill=$('rs-level'); pill.className='congestion-pill '+data.congestion_level;
+    pill.textContent=data.congestion_level+' traffic';
+    resultBox.style.display='block';
+  } catch(e){ errorBox.style.display='block'; errorBox.textContent='⚠️ Connection error: '+e.message; }
+}
+
+// ---------- Location search ----------
+async function askLocation(){
+  const q=$('locationInput').value.trim(); if(!q) return;
+  const box=$('location-box'); box.style.display='block'; box.textContent='Searching…';
+  try {
+    const res=await fetch(`${API_BASE}/location-query`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
+    const data=await res.json();
+    box.textContent=data.answer||'No answer available.';
+  } catch(e){ box.textContent='Error reaching the server.'; }
+}
+$('locationInput').addEventListener('keydown', e => { if(e.key==='Enter') askLocation(); });
+
+// ---------- Chat + Voice ----------
+function askChip(el){ $('chatInput').value=el.textContent; sendChat(); }
+
+let voiceOutEnabled=false;
+$('voiceOutToggle').addEventListener('click', () => {
+  voiceOutEnabled=!voiceOutEnabled;
+  $('voiceOutToggle').classList.toggle('on', voiceOutEnabled);
+});
+
+function speakText(text){
+  if(!voiceOutEnabled || !('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utter=new SpeechSynthesisUtterance(text);
+  utter.rate=1.0;
+  window.speechSynthesis.speak(utter);
+}
+
+// Voice input (Web Speech API — Chrome/Edge support webkitSpeechRecognition)
+const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition=null, listening=false;
+if(SpeechRecognitionAPI){
+  recognition=new SpeechRecognitionAPI();
+  recognition.continuous=false; recognition.interimResults=false; recognition.lang='en-IN';
+  recognition.onresult=(e)=>{ $('chatInput').value=e.results[0][0].transcript; sendChat(); };
+  recognition.onend=()=>{ listening=false; $('micBtn').classList.remove('mic-active'); };
+  recognition.onerror=()=>{ listening=false; $('micBtn').classList.remove('mic-active'); };
+} else {
+  $('micBtn').title='Voice input not supported in this browser (try Chrome)';
+}
+$('micBtn').addEventListener('click', () => {
+  if(!recognition){ alert('Voice input needs Chrome or Edge browser.'); return; }
+  if(listening){ recognition.stop(); return; }
+  listening=true; $('micBtn').classList.add('mic-active'); recognition.start();
+});
+
+function addChatMessage(role,text){
+  const msg=document.createElement('div'); msg.className='chat-msg';
+  const labels={user:'🧑 You', assistant:'🤖 Genie', system:'⚙️ System'};
+  msg.innerHTML=`<span class="role ${role}">${labels[role]}</span><span>${text}</span>`;
+  $('chatMessages').appendChild(msg); $('chatMessages').scrollTop=$('chatMessages').scrollHeight;
+}
+
+$('chatBtn').addEventListener('click', sendChat);
+$('chatInput').addEventListener('keydown', e => { if(e.key==='Enter') sendChat(); });
+
+async function sendChat(){
+  const q=$('chatInput').value.trim(); if(!q) return;
+  addChatMessage('user', q); $('chatInput').value=''; $('chatBtn').disabled=true;
+
+  const loader=document.createElement('div'); loader.className='chat-msg'; loader.id='chatLoader';
+  loader.innerHTML=`<span class="role assistant">🤖 Genie</span><span><span class="spinner"></span>thinking…</span>`;
+  $('chatMessages').appendChild(loader); $('chatMessages').scrollTop=$('chatMessages').scrollHeight;
+
+  try {
+    const res=await fetch(`${API_BASE}/chat`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});
+    const data=await res.json();
+    document.getElementById('chatLoader')?.remove();
+    const answer=data.answer||'No response from server.';
+    addChatMessage('assistant', answer);
+    speakText(answer);
+    $('engineBadge').textContent = 'Gemini';
+  } catch(err){
+    document.getElementById('chatLoader')?.remove();
+    addChatMessage('system','⚠️ Connection failed: '+err.message+' — check the VS Code terminal for a crash/error.');
+  }
+  $('chatBtn').disabled=false;
+}
+</script>
+</body>
+</html>

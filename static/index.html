@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>SignalSense AI — test upload</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 40px auto; }
+    #result { white-space: pre-wrap; background: #f4f4f4; padding: 16px; border-radius: 8px; margin-top: 20px; }
+    input, button { padding: 8px; margin: 6px 0; }
+  </style>
+</head>
+<body>
+  <h2>SignalSense AI — quick test</h2>
+  <p>Upload one traffic frame to test the full pipeline.</p>
+
+  <form id="uploadForm">
+    <label>Junction ID: <input type="text" id="junctionId" value="junction_01"></label><br>
+    <input type="file" id="frameInput" accept="image/*"><br>
+    <button type="submit">Analyze frame</button>
+  </form>
+
+  <div id="result">Result will appear here…</div>
+
+  <script>
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const junctionId = document.getElementById('junctionId').value;
+      const file = document.getElementById('frameInput').files[0];
+      if (!file) { alert('Choose an image first'); return; }
+
+      const formData = new FormData();
+      formData.append('junction_id', junctionId);
+      formData.append('frame', file);
+
+      document.getElementById('result').textContent = 'Analyzing…';
+
+      const resp = await fetch('/analyze-junction', { method: 'POST', body: formData });
+      const data = await resp.json();
+      document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+    });
+  </script>
+</body>
+</html>
