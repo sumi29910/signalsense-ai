@@ -13,6 +13,7 @@ so nothing downstream (safety guardrail, dashboard rendering, Qdrant
 logging) needs to change.
 """
 import os
+import time
 import base64
 import google.generativeai as genai
 from agents.json_utils import extract_json
@@ -56,13 +57,21 @@ def analyze_frame(image_bytes: bytes) -> dict:
 
     model = genai.GenerativeModel(MODEL_NAME)
 
-    try:
-        response = model.generate_content([ANALYSIS_PROMPT, image_part])
-        parsed = extract_json(response.text)
-        if parsed is None:
-            return _fallback(parse_error=True, raw=response.text[:200])
-    except Exception as e:
-        return _fallback(api_error=str(e))
+    parsed = None
+    last_error = None
+    for attempt in range(3):
+        try:
+            response = model.generate_content([ANALYSIS_PROMPT, image_part])
+            parsed = extract_json(response.text)
+            if parsed is None:
+                return _fallback(parse_error=True, raw=response.text[:200])
+            break
+        except Exception as e:
+            last_error = e
+            if "429" in str(e) and attempt < 2:
+                time.sleep(8 * (attempt + 1))  # 8s, then 16s
+                continue
+            return _fallback(api_error=str(e))
 
     # Split into the shape the rest of the app already expects
     violations = {
