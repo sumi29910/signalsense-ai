@@ -4,9 +4,7 @@ The dashboard's chat also has an alternative real ADK agent (see
 agents/adk_agent.py) — this coordinator handles the frame-analysis
 pipeline specifically (upload -> detect -> store -> log).
 """
-from agents.violation_detection import detect_violations
-from agents.congestion_agent import analyze_congestion
-from agents.emergency_agent import check_emergency_vehicle
+from agents.frame_analysis_agent import analyze_frame
 from memory.qdrant_store import log_event, get_junction_history
 from safety.guardrail import safety_check
 from storage.local_store import save_frame_locally
@@ -21,18 +19,17 @@ def route_analysis(junction_id: str, image_bytes: bytes) -> dict:
     except Exception as e:
         history = {"junction_id": junction_id, "past_event_count": 0, "recent_events": [], "memory_error": str(e)}
 
-    # Step 2: run detection agents. Each of these already has its own
-    # internal try/except (see agents/violation_detection.py etc.) so a
-    # Gemini quota error returns a safe default instead of raising.
-    violations = detect_violations(image_bytes, history=history)
-    congestion = analyze_congestion(image_bytes, history=history)
-    emergency = check_emergency_vehicle(image_bytes)
+    # Step 2: ONE Gemini call analyzes violations + congestion + emergency
+    # together (previously 3 separate calls — that was burning through the
+    # free-tier quota 3x faster than necessary, which is what caused the
+    # repeated 429 errors).
+    analysis = analyze_frame(image_bytes)
 
     raw_result = {
         "junction_id": junction_id,
-        "violations": violations,
-        "congestion": congestion,
-        "emergency": emergency,
+        "violations": analysis["violations"],
+        "congestion": analysis["congestion"],
+        "emergency": analysis["emergency"],
     }
 
     # Step 3: safety / false-positive guardrail before anything gets flagged

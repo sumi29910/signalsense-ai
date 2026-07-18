@@ -9,6 +9,7 @@ decides on its own whether to check junction history, forecast, plan a
 corridor, or look up real-world traffic via Google Maps.
 """
 import os
+import time
 import google.generativeai as genai
 
 from agents.genie_tools import (
@@ -54,14 +55,23 @@ _model = genai.GenerativeModel(
 
 
 def ask_genie(question: str) -> dict:
-    try:
-        chat = _model.start_chat(enable_automatic_function_calling=True)
-        response = chat.send_message(question)
-        return {"question": question, "answer": response.text}
-    except Exception as e:
-        # Never let a quota error, tool error, or API hiccup crash the
-        # /chat endpoint — Genie always replies with something.
-        return {
-            "question": question,
-            "answer": f"I ran into an issue answering that ({str(e)[:150]}). Please try again.",
-        }
+    last_error = None
+    for attempt in range(2):  # one retry after a short wait, that's it
+        try:
+            chat = _model.start_chat(enable_automatic_function_calling=True)
+            response = chat.send_message(question)
+            return {"question": question, "answer": response.text}
+        except Exception as e:
+            last_error = e
+            if "429" in str(e) and attempt == 0:
+                time.sleep(4)  # brief pause, free-tier limits are per-minute
+                continue
+            break
+
+    if "429" in str(last_error):
+        answer = ("I'm temporarily rate-limited by the free Gemini API tier — "
+                  "this resets after about a minute. Please wait a moment and ask again.")
+    else:
+        answer = f"I ran into an issue answering that ({str(last_error)[:150]}). Please try again."
+
+    return {"question": question, "answer": answer}
